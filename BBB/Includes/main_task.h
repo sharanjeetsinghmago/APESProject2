@@ -9,6 +9,7 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <linux/ioctl.h>
+#include "socket_task.h"
 
 
 typedef struct packet
@@ -19,6 +20,12 @@ typedef struct packet
   char timestamp[25];
   char c;
 }log_packet;
+
+log_packet rec;
+
+float alti=0,humid=0;
+
+float get_altitude();
 
 void *func_comm();
 
