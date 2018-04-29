@@ -1,5 +1,6 @@
 #include "main_task.h"
-
+#include <mqueue.h>
+#include <float.h>
 
 pthread_t comm_id, logger_id, alert_id;
 
@@ -7,16 +8,17 @@ void *func_comm()
 {
 	int i;
 	int n,fd;
-	
+	mqd_t mq1;
 	fd = uart_init();
 	printf("Communication Task Started\n");
+        mq1 = mq_open("/my_queue",O_RDWR | O_CREAT, 0666, NULL);
 	while(1)
 	{
 		// printf("Signal from Comm Task\n");
 		// for(i=0;i<1000000000;i++);
 		if((n=read(fd,&rec,sizeof(rec))) < 0)
 	    {
-    	    //printf("\nRead Fail\n");
+    	         //printf("\nRead Fail\n");
 		}
 		else if(n>0)
 		{
@@ -39,6 +41,7 @@ void *func_comm()
 				printf("Humidity = %f\n",rec.data);
 				printf("Humid = %f\n\n",humid);
 			}
+                        mq_send(mq1,(char *)&rec,sizeof(rec),1);
 		}
 
 	 }
@@ -53,7 +56,36 @@ float get_altitude()
 
 void *func_logger()
 {
-
+        FILE *fptr;
+        mqd_t my_queue; 
+	log_packet given;
+        fptr = fopen("log.txt","w");   //use logger_thread -> filename
+	fprintf(fptr,"In logger task of BBB.\n");
+        my_queue = mq_open("/my_queue",O_RDWR | O_CREAT, 0666, NULL);
+        struct mq_attr *pact;
+        pact = malloc(sizeof(struct mq_attr));
+        mq_getattr(my_queue,pact);
+        //fprintf(fptr,"Message queue initialised\n");
+        printf("[Logger Thread] Message queue initialised.\n");
+        fclose(fptr);
+while(1)
+{
+        fptr = fopen("log.txt","a");
+	mq_receive(my_queue,(char *)&given,pact->mq_msgsize,NULL);
+	if(given.log_id == 1)
+	{
+	
+         fprintf(fptr,"Timestamp:%s, Log level:%d, Log ID:%d, Altitude is: %f\n",given.timestamp,given.log_level,given.log_id,given.data);
+	}
+	else if (given.log_id == 2);
+	{
+	
+         fprintf(fptr,"Timestamp:%s, Log level:%d, Log ID:%d, Humidity is: %f\n",given.timestamp,given.log_level,given.log_id,given.data);
+	}
+        fclose(fptr);
+}
+        printf("[Logger Thread] Terminating message queue\n");
+        return fptr;
 }
 
 void *func_alert()
