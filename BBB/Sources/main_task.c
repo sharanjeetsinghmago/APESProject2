@@ -7,7 +7,7 @@ void *func_comm()
 {
 	int i;
 	int n,fd;
-	log_packet rec,recv;
+	
 	fd = uart_init();
 	printf("Communication Task Started\n");
 	while(1)
@@ -27,18 +27,28 @@ void *func_comm()
   			//printf("Data recv\n");
 
 			if(rec.log_id == 1)
-			{	
+			{
+				alti=rec.data;	
 				printf("Altitude = %f\n",rec.data);
+				printf("Alti = %f\n",alti);
 			}
 
 			if(rec.log_id == 2)
-			{	
-				printf("Humidity = %f\n\n",rec.data);
+			{
+				humid=rec.data;
+				printf("Humidity = %f\n",rec.data);
+				printf("Humid = %f\n\n",humid);
 			}
 		}
 
 	 }
 
+}
+
+float get_altitude()
+{
+	printf("Alti req = %f\n",alti);
+	return alti;
 }
 
 void *func_logger()
@@ -48,7 +58,7 @@ void *func_logger()
 
 void *func_alert()
 {
-
+	socket_task();
 }
 
 
