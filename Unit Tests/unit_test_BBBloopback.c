@@ -5,24 +5,12 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <linux/ioctl.h>
-#include "comm_task.h"
 
 struct termios *configure;
 
 int fd;
 
 char *device = "/dev/ttyO4";
-
-typedef struct packet
-{
-  uint8_t log_id;
-  uint8_t log_level;
-  float data;
-  char timestamp[25];
-  char c;
-}log_packet;
-
-
 
 /*Function to configure UART*/
 void tty_config(struct termios *con, int descriptor)
@@ -66,3 +54,48 @@ int uart_init(void)
   return fd;
 }
 
+typedef struct packet
+{
+  uint8_t log_id;
+  uint8_t log_level;
+  float data;
+  char timestamp[25];
+  char c;
+}log_packet;
+
+void main()
+{
+  uart_init();  
+
+  log_packet rec,recv;
+
+  recv.log_id = 9;
+  recv.log_level = 2;
+  recv.data = 5.9;
+
+  //read(fd,&rec,sizeof(rec));
+  
+  //read(fd,&rec,sizeof(rec));
+  char x='a';
+  volatile char y=5;
+
+  int n;
+printf("%d\n",fd );
+printf("Sending Data\n");
+  if((n=write(fd,&x,sizeof(x))) < 0){
+        printf("\nWrite Fail\n");
+}
+
+
+//printf("Waiting for recv data\n");
+if((n=read(fd,&y,sizeof(y))) < 0)
+{
+    printf("\nRead Fail\n");
+}
+
+if( y == x )
+  printf("[Success] UART Loopback \n");
+else
+  printf("[Failure] UART Loopback \n");
+
+}
