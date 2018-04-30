@@ -9,3 +9,5 @@
 void tty_config(struct termios *con, int descriptor);
 
 int uart_init(void);
+
+int spi_init(void);

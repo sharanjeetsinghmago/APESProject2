@@ -13,6 +13,8 @@ int fd;
 
 char *device = "/dev/ttyO4";
 
+char *device_spi = "/dev/spidev1.0";
+
 typedef struct packet
 {
   uint8_t log_id;
@@ -66,3 +68,16 @@ int uart_init(void)
   return fd;
 }
 
+int spi_init(void)
+{
+   
+  fd = open(device_spi, O_RDWR | O_NOCTTY | O_SYNC);// | O_NDELAY);
+  if(fd == -1)
+  { 
+    perror("ERROR opening file descriptor\n");
+  }
+
+    
+
+  return fd;
+}

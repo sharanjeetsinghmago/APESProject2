@@ -1,0 +1,37 @@
+In logger task of BBB.
+Startup test successfull, Log level:0, Log ID:4
+Alert thread started, Log level:0, Log ID:6
+Communication thread started, Log level:0, Log ID:5
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:1, Altitude is: 1634.187500
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:2, Humidity is: 12.136978
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:1, Altitude is: 1634.187500
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:2, Humidity is: 12.136978
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:1, Altitude is: 1634.187500
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:2, Humidity is: 12.136978
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:1, Altitude is: 1634.187500
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:2, Humidity is: 12.136978
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:1, Altitude is: 1634.187500
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:2, Humidity is: 12.136978
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:1, Altitude is: 1634.187500
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:2, Humidity is: 12.136978
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:1, Altitude is: 1633.687500
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:2, Humidity is: 12.136978
+Timestamp:Thu May 13 16:10:32 2032
+, Log level:1, Log ID:2, Humidity is: 12.136978
+Error in Altitude thread, Log level:2, Log ID:1
+Gracefully exited, Log level:0, Log ID:7
+

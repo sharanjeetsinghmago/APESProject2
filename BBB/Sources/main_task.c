@@ -1,6 +1,10 @@
 #include "main_task.h"
 #include <mqueue.h>
 #include <float.h>
+#include <signal.h>
+
+#define UART_COMM
+//#define SPI_COMM
 
 #define HB_PORT_ADR 5000
 #define IP_ADR      "127.0.0.1"
@@ -47,6 +51,26 @@ void LEDOn(void)
         }
         else
                 printf("LEDOn error\n");
+}
+
+
+void kill_all()
+{
+  
+  
+  printf("<<<Killing all threads>>>\n");
+  mqd_t my_queue;
+  log_packet my_msg;
+  my_queue = mq_open("/my_queue",O_RDWR | O_CREAT, 0666, NULL);
+  my_msg.log_level = 0;
+  my_msg.log_id = 7;
+  mq_send(my_queue,(char *)&my_msg,sizeof(my_msg),1);
+
+  pthread_cancel(comm_id);
+  pthread_cancel(alert_id);
+  pthread_cancel(socket_id);
+  pthread_cancel(logger_id);
+
 }
 
 int comm_client()
@@ -123,11 +147,31 @@ int comm_client()
 void *func_comm()
 {
 	int i;
-	int n,fd;
+	int n,fd,fd_spi;
 	mqd_t mq1;
-	fd = uart_init();
+  log_packet my_msg;
+
+
+  #ifdef UART_COMM
+	 
+    fd = uart_init();
+
+  #endif
+
+  #ifdef SPI_COMM
+
+    fd = spi_init();
+
+  #endif  
+  
+    
 	printf("[Communication Thread] Communication Thread Started\n");
    	     mq1 = mq_open("/my_queue",O_RDWR | O_CREAT, 0666, NULL);
+
+         my_msg.log_id = 5;
+         my_msg.log_level = 0;
+         mq_send(mq1,(char *)&my_msg,sizeof(rec),1);
+
 	while(1)
 	{
 		// printf("Signal from Comm Task\n");
@@ -160,14 +204,15 @@ void *func_comm()
 					//printf("Humid = %f\n\n",humid);
 					mq_send(mq1,(char *)&rec,sizeof(rec),1);
 				}
-            }
-            else if(rec.log_level == 2)
-            {
-            	if(rec.log_id == 1)
+      }
+      else if(rec.log_level == 2)
+      {
+      	if(rec.log_id == 1)
 				{
 					
 					printf("[Altitude Task] Error in altitude task\n");
 					mq_send(mq1,(char *)&rec,sizeof(rec),1);
+          kill_all();
 				}
 
 				if(rec.log_id == 2)
@@ -212,14 +257,53 @@ void *func_logger()
 		mq_receive(my_queue,(char *)&given,pact->mq_msgsize,NULL);
 		if(given.log_id == 1)
 		{
-	
+           if(given.log_level == 1)
+           {
         	 fprintf(fptr,"Timestamp:%s, Log level:%d, Log ID:%d, Altitude is: %f\n",given.timestamp,given.log_level,given.log_id,given.data);
+            }
+            else if(given.log_level == 2)
+            {
+              fprintf(fptr,"Error in Altitude thread, Log level:%d, Log ID:%d \n",given.log_level,given.log_id);
+            }
 		}
 		else if (given.log_id == 2)
 		{
-	
+	         if(given.log_level == 1)
+           {
         	 fprintf(fptr,"Timestamp:%s, Log level:%d, Log ID:%d, Humidity is: %f\n",given.timestamp,given.log_level,given.log_id,given.data);
+           }
+            else if(given.log_level == 2)
+            {
+              fprintf(fptr,"Error in umidity thread, Log level:%d, Log ID:%d \n",given.log_level,given.log_id);
+            }
 		}
+    else if (given.log_id == 4)
+    {
+           if(given.log_level == 0)
+           {
+           fprintf(fptr,"Startup test successfull, Log level:%d, Log ID:%d \n",given.log_level,given.log_id);
+            }
+            else if(given.log_level == 2)
+            {
+               fprintf(fptr,"Startup test failed, Log level:%d, Log ID:%d \n",given.log_level,given.log_id);
+            }
+    }
+    else if (given.log_id == 5)
+    {
+  
+           fprintf(fptr,"Communication thread started, Log level:%d, Log ID:%d \n",given.log_level,given.log_id);
+    }
+
+    else if (given.log_id == 6)
+    {
+  
+           fprintf(fptr,"Alert thread started, Log level:%d, Log ID:%d \n",given.log_level,given.log_id);
+    }   
+        else if (given.log_id == 7)
+    {
+  
+           fprintf(fptr,"Gracefully exited, Log level:%d, Log ID:%d \n",given.log_level,given.log_id);
+    } 
         fclose(fptr);
 	}
     printf("[Logger Thread] Terminating message queue\n");
@@ -309,17 +393,25 @@ void *func_alert()
 {
 	int alti_flag=0,humid_flag=0,p;
 	printf("[Alert Thread] Alert Thread Started\n");
-	
+	mqd_t my_queue;
+  log_packet my_msg;
+  my_queue = mq_open("/my_queue",O_RDWR | O_CREAT, 0666, NULL);
+  my_msg.log_level = 0;
+  my_msg.log_id = 6;
+  mq_send(my_queue,(char *)&my_msg,sizeof(my_msg),1);
+
 	while(1)
 	{
 		if(alti >= 8843)
 		{
 			//printf("[Alert Task]You have reached top of the world!!!\n");
 			alti_flag = 1;
+      LEDOn();
 		}
 		else
 		{
 			alti_flag = 0;
+      LEDOff();
 		}
 
 		if(humid >= 20)
@@ -454,15 +546,21 @@ int startup_test()
 
 int main()
 {
-
+  mqd_t my_queue;
 	int startup_check = startup_test();
-
+  
 	pthread_create(&logger_id, NULL, func_logger, NULL);
-
-	
+  log_packet my_msg;
+	my_queue = mq_open("/my_queue",O_RDWR | O_CREAT, 0666, NULL);
 	if(startup_check == 1)
 	{
 		printf("Startup Success!!\n\n");
+    my_msg.log_id= 4;
+    my_msg.log_level = 0;
+    mq_send(my_queue,(char *)&my_msg,sizeof(my_msg),1);
+
+
+
 	}
 	else if(startup_check == 0)
 	{
@@ -471,10 +569,13 @@ int main()
 		pthread_cancel(logger_id);
 		pthread_cancel(comm_id);
 		pthread_cancel(alert_id);
+    my_msg.log_id= 4;
+    my_msg.log_level = 2;
+    mq_send(my_queue,(char *)&my_msg,sizeof(my_msg),1);
 	}
 
 	check_status();
-
+   
 	pthread_join(logger_id,NULL);
 	pthread_join(comm_id,NULL);
 	pthread_join(alert_id,NULL);
