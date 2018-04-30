@@ -109,68 +109,18 @@ while(1)
 
   if(strcmp(ploadptr->buf,"get_humidity")==0)
   {
-  	printf("You Want Temperature in Celcius\n");
-   // temp = read_temp_data_reg(0);
-    //printf("Temp in cel %f\n",temp );
     snprintf(ackbuf, 50, "Humidity = %f",humid);
     send(accepted_soc , ackbuf , 50, 0);
   }
   else if(strcmp(ploadptr->buf,"get_altitude")==0)
   {
-  	printf("You Want Temperature in Kelvin\n");
-   // temp = read_temp_data_reg(1);
-    //temp = get_altitude();
-    //printf("Temp in cel %f\n",temp );
-    snprintf(ackbuf, 50, " Altitude = %f",alti);
+  	snprintf(ackbuf, 50, " Altitude = %f",alti);
     send(accepted_soc , ackbuf , 50, 0);
   }
-  else if(strcmp(ploadptr->buf,"get_temp_fahrenheit")==0)
-  {
-  	printf("You Want Temperature in Fahrenheit\n");
-   // temp = read_temp_data_reg(2);
-    //printf("Temp in cel %f\n",temp );
-    snprintf(ackbuf, 50, "Temp in celcius %f",temp);
-    send(accepted_soc , ackbuf , 50, 0);
-  }
-  else if(strcmp(ploadptr->buf,"isitday")==0)
-  {
-  	printf("Day ? Don't Know!!\n");
-   // lumen = get_lux();
-    if(lumen < 10)
-    {
-      send(accepted_soc , "No, it is Night" , 50, 0);
-    }
-    else
-    {
-      send(accepted_soc , "Yes, it is Day" , 50, 0);
-    }
-  }
-  else if(strcmp(ploadptr->buf,"isitnight")==0)
-  {
-  	printf("Night ? Don't Know!!\n");
-   // lumen = get_lux();
-    if(lumen < 10)
-    {
-      send(accepted_soc , "Yes, it is Night" , 50, 0);
-    }
-    else
-    {
-      send(accepted_soc , "No, it is Day" , 50, 0);
-    }
-  }
-  else if(strcmp(ploadptr->buf,"get_lux")==0)
-  {
-    printf("You want the lumen value!!\n");
-    //lumen = get_lux();
-    printf("Lux value %f\n",lumen );
-    snprintf(ackbuf, 50, "Lux Value is %f",lumen);
-    send(accepted_soc , ackbuf , 50, 0);
-
-  }else
+  else
   {
   	printf("I Don't Understand !!");
     send(accepted_soc , "I Don't Understand !!" , 50, 0);
-    printf("[Socket] Alti = %f\n",alti);
   }
 
   /* send message from server to client */
