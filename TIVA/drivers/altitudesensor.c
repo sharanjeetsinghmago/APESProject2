@@ -94,7 +94,7 @@ float get_altitude(void)
     i2c_read(0x60,0x01, &data[0]);
     i2c_read(0x60,0x02, &data[1]);
     i2c_read(0x60,0x03, &data[2]);
-    convert=(float)((short)(data[0]<<8)|(data[1])) + (float)(data[2]>>4)*0.0625 - 30;
+    convert=(float)((short)(data[0]<<8)|(data[1])) + (float)(data[2]>>4)*0.0625 - 70;
     return convert;
 }
 

@@ -16,6 +16,7 @@
 #include "driverlib/rom_map.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
+#include "driverlib/ssi.h"
 #include "driverlib/i2c.h"
 #include "utils/uartstdio.h"
 #include "FreeRTOSConfig.h"
@@ -27,11 +28,13 @@
 #include "string.h"
 #include <time.h>
 
+#define UART_COMM
 
-uint32_t g_ui32SysClock;
 TimerHandle_t xTimer1,xTimer2;
-TaskHandle_t xTaskHandle3;
+TaskHandle_t xHBTaskHandle;
 QueueHandle_t HQueue, AQueue;
+BaseType_t xHBTask;
+
 volatile float humidity;
 void AltitudeTask(void *pvParameters);
 void HumidityTask(void *pvParameters);
@@ -43,6 +46,7 @@ __error__(char *pcFilename, uint32_t ui32Line)
 {
 }
 #endif
+
 
 struct Message
 {
@@ -56,11 +60,8 @@ struct Message
 #define ALT  0x01
 #define HUMID  0X02
 
-//*****************************************************************************
-//
-// Configure the UART and its pins.  This must be called before UARTprintf().
-//
-//*****************************************************************************
+uint32_t g_ui32SysClock;
+
 void ConfigureUART(void)
 {
 
@@ -113,6 +114,43 @@ void uart7_send(const uint8_t *pui8Buffer, uint32_t ui32Count)
     }
 }
 
+void
+InitSPI3(void)
+{
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_SSI3);
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+
+    //
+    // Configure the pin muxing for SSI3 functions on port H4, H5, H6 and H7.
+    // This step is not necessary if your part does not support pin muxing.
+    //
+    GPIOPinConfigure(GPIO_PF3_SSI3CLK);
+    GPIOPinConfigure(GPIO_PF2_SSI3FSS);
+    GPIOPinConfigure(GPIO_PF0_SSI3XDAT1);
+    GPIOPinConfigure(GPIO_PF1_SSI3XDAT0);
+
+    GPIOPinTypeSSI(GPIO_PORTF_BASE, GPIO_PIN_3 | GPIO_PIN_1 | GPIO_PIN_0 |
+                   GPIO_PIN_2);
+
+    SSIConfigSetExpClk(SSI3_BASE, g_ui32SysClock, SSI_FRF_MOTO_MODE_2,
+                       SSI_MODE_SLAVE, 100000, 8);
+
+    SSIEnable(SSI3_BASE);
+}
+
+void spi3_send(const uint8_t *pui32Data, uint32_t ui32Index)
+{
+    while(ui32Index--)
+    {
+        SSIDataPut(SSI3_BASE , *pui32Data ++ );
+    }
+    while(SSIBusy(SSI3_BASE))
+    {
+    }
+
+}
 
 void vTimerCallback1( TimerHandle_t xTimer1 )
 {
@@ -133,10 +171,17 @@ void vTimerCallback1( TimerHandle_t xTimer1 )
     AQueue = xQueueCreate( 10, sizeof( struct Message ) );
     xQueueSend( AQueue, &pxMessage, 10 );
     */
-    xQueueSendToBack( HQueue, &px1Message, 10 );
+    //xQueueSendToBack( HQueue, &px1Message, 10 );
     //UARTprintf("%d", (int)altitude);
-    //xTaskNotify( xTaskHandle3,ALT , eSetBits );
 
+    if(altitude < 0 || altitude > 8850)
+    {
+        xTaskNotify( xHBTaskHandle,ALT , eSetBits );
+    }
+    else
+    {
+        xQueueSendToBack( HQueue, &px1Message, 10 );
+    }
 }
 
 void vTimerCallback2( TimerHandle_t xTimer2 )
@@ -154,11 +199,20 @@ void vTimerCallback2( TimerHandle_t xTimer2 )
             pxMessage.data = humidity;
             humidity = humidity1;
 
-
+    //xQueueSendToBack( HQueue, &pxMessage, 10 );
     pxMessage.log_id = 2;
     pxMessage.log_level = 1;
-    xQueueSendToBack( HQueue, &pxMessage, 10 );
+    //xQueueSendToBack( HQueue, &pxMessage, 10 );
 
+    if(humidity < 0 || humidity > 100)
+        {
+            xTaskNotify( xHBTaskHandle,HUMID , eSetBits );
+        }
+
+    else
+    {
+        xQueueSendToBack( HQueue, &pxMessage, 10 );
+    }
 }
 void AltitudeTask(void *pvParameters)
 {
@@ -204,14 +258,59 @@ void LoggerTask(void *pvParameters)
                                   UARTprintf("Log Level = %d  ",pxRxedMessage.log_level);
                                  }
 
+                         #ifdef UART_COMM
                          uart7_send((uint8_t *)&pxRxedMessage,sizeof(pxRxedMessage));
+                         #else
+                          spi3_send((uint8_t *)&pxRxedMessage, sizeof(pxRxedMessage));
+                        #endif
                 }
         //SysCtlDelay(g_ui32SysClock / 2 / 3);
     }
 }
 
-int main(void)
+void HBTask(void *pvParameters)
 {
+    uint32_t val_recv;
+    struct Message hbmsg;
+    time_t a = time(NULL);
+    while(1)
+    {
+        xHBTask = xTaskNotifyWait(0, 0xFF, &val_recv, portMAX_DELAY);
+        if(xHBTask == pdTRUE)
+        {
+            if(val_recv & 0x01)
+            {
+                UARTprintf("Error in Heartbeat from Altitude \n");
+
+            char* temp=ctime(&a);
+            strcpy(hbmsg.timestamp,temp);
+
+            hbmsg.data = -2;
+
+            hbmsg.log_id = 1;
+            hbmsg.log_level = 2;
+            xQueueSendToBack( HQueue, &hbmsg, 10 );
+            }
+
+            if(val_recv & 0x02)
+            {
+            UARTprintf("Error in Heartbeat from Humidity \n");
+
+            char* temp=ctime(&a);
+            strcpy(hbmsg.timestamp,temp);
+
+            hbmsg.data = -2;
+
+            hbmsg.log_id = 2;
+            hbmsg.log_level = 2;
+            xQueueSendToBack( HQueue, &hbmsg, 10 );
+            }
+        }
+    }
+}
+
+int main(void)
+ {
 
     //
     // Run from the PLL at 120 MHz.
@@ -228,8 +327,11 @@ int main(void)
     ROM_GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, GPIO_PIN_1);
 
     ConfigureUART();
+
     uart7_init();
 
+
+    InitSPI3();
     UARTprintf("UART Configured");
 
     ConfigureAltitude();
@@ -239,66 +341,16 @@ int main(void)
 
     SysCtlDelay(g_ui32SysClock / 2 / 3);
     humidity = get_humidity();
-    /*
-    if(ConfigureHumidity() != 0 )
-    {
-        UARTprintf("Couldn't Configure the humidity sensor\n");
-    }
-    SysCtlDelay(g_ui32SysClock / 2 / 3);
-    UARTprintf("Configured Humidity and Temperature sensor\n");
 
-    SysCtlDelay(g_ui32SysClock / 2 / 3);
-    ConfigureAltitude();
-    UARTprintf("Configured Altitude sensor\n");
-    SysCtlDelay(g_ui32SysClock / 2 / 3);
-
-
-
-
-    SysCtlDelay(g_ui32SysClock / 2 / 3);
-    humidity = get_humidity();
-
-    SysCtlDelay(g_ui32SysClock / 2 / 3);
-
-    temp = get_temp();
-
-    SysCtlDelay(g_ui32SysClock / 2 / 3);
-    while(1)
-    {
-        SysCtlDelay(g_ui32SysClock / 2 / 3);
-        humidity1 = get_humidity();
-        if((humidity - humidity1) > 10.0 || (humidity1 - humidity) > 10.0)
-                {
-                    humidity1 = humidity;
-                }
-        UARTprintf("Humidity is %d percent.\n",(int)humidity1);
-        humidity = humidity1;
-        SysCtlDelay(g_ui32SysClock / 2 / 3);
-
-
-        temp1 = get_temp();
-        if((temp - temp1) > 5.0 || (temp1 - temp) > 5.0)
-        {
-            temp1 = temp;
-        }
-        UARTprintf("Temperature is %d Celcius.\n",(int)temp1);
-        temp = temp1;
-        SysCtlDelay(g_ui32SysClock / 2 / 3);
-
-        altitude = get_altitude();
-        UARTprintf("Altitude = %d metres.\n ",(int)altitude);
-
-        SysCtlDelay(g_ui32SysClock / 2 / 3);
-    */
-
-        /* freertos based code */
-
+    /* freertos based code */
 
     xTaskCreate(AltitudeTask, (const portCHAR *)"ALTITUDE_TASK",configMINIMAL_STACK_SIZE, NULL, 1, NULL);
 
     xTaskCreate(HumidityTask, (const portCHAR *)"HUMIDITY_TASK",configMINIMAL_STACK_SIZE, NULL, 1, NULL);
 
-    xTaskCreate(LoggerTask, (const portCHAR *)"LOGGER_TASK",configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandle3);
+    xTaskCreate(LoggerTask, (const portCHAR *)"LOGGER_TASK",configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+
+    xTaskCreate(HBTask, (const portCHAR *)"HB_TASK",configMINIMAL_STACK_SIZE, NULL, 1, &xHBTaskHandle);
 
     vTaskStartScheduler();
 
