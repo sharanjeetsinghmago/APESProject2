@@ -21,6 +21,13 @@ typedef struct packet
   char c;
 }log_packet;
 
+typedef struct
+{
+  char    buf[20];
+  int  buf_len;
+  bool    usrLED_OnOff;
+}payload_t;
+
 log_packet rec;
 
 float alti=0,humid=0;

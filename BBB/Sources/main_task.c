@@ -2,6 +2,9 @@
 #include <mqueue.h>
 #include <float.h>
 
+#define HB_PORT_ADR 5000
+#define IP_ADR      "127.0.0.1"
+
 pthread_t comm_id, logger_id, alert_id, socket_id;
 
 char* PATH = "/sys/class/leds/beaglebone:green:usr1/trigger";
@@ -18,29 +21,6 @@ void remove_trigger(void) {
                 printf("Error\n");
 }
 
-// void LEDBlink(void)
-// {
-//     FILE* LED = NULL;
-//     remove_trigger();
-
-//     if((LED = fopen("/sys/class/leds/beaglebone:green:usr1/trigger", "r+")))
-//     {
-//         fwrite("timer", 1, 5, LED);
-//         fclose(LED);
-//     }       
-
-//     if((LED = fopen("/sys/class/leds/beaglebone:green:usr1/trigger/delay_on", "$on", "r+")))
-//     {
-//         fwrite("50", 1, 2, LED);
-//         fclose(LED);
-//     }
-
-//     if((LED = fopen("/sys/class/leds/beaglebone:green:usr1/trigger/delay_off", "$off", "r+"))) 
-//     {
-//         fwrite("50", 1, 2, LED);
-//         fclose(LED);
-//     }    
-// }
 
 void LEDOff(void)
 {
@@ -67,6 +47,77 @@ void LEDOn(void)
         }
         else
                 printf("LEDOn error\n");
+}
+
+int comm_client()
+{
+  int client_socket = 0;
+  struct sockaddr_in serv_addr = {0};
+  const char* msg = "Comm Task Alive";
+  payload_t ploadSend;
+  int sent_b;
+  size_t pload_size;
+  char r_data[4] = {0};
+
+  /* Enter the message into payload structure */
+  memcpy(ploadSend.buf,msg,strlen(msg)+1);
+  ploadSend.buf_len = strlen(ploadSend.buf);
+  ploadSend.usrLED_OnOff = 1;
+
+  /* create socket */
+  if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+  {
+    //printf("[Client] [ERROR] Socket creation Error\n");
+    return -1;
+  }
+  else
+    //printf("[Client] Socket Created Successfully\n");
+
+  /* Fill the socket address structure */
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_port = htons(HB_PORT_ADR);
+      
+  /* convert the IP ADDR to proper format */
+  if(inet_pton(AF_INET, IP_ADR, &serv_addr.sin_addr)<=0) 
+  {
+    //printf("[Client] [ERROR] Address Conversion Error\n");
+    return -1;
+  }
+  
+  /* connect the socket before sending the data */
+  if (connect(client_socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+  {
+    //printf("[Client] [ERROR] Connection Failed \n");
+    return -1;
+  }
+
+  /*send the size of the incoming payload */
+  pload_size = sizeof(ploadSend);
+  sent_b = send(client_socket,&pload_size,sizeof(size_t), 0);
+  //printf("[Client] Sent payload size: %d\n", pload_size);
+
+  /*Sending the payload */
+  sent_b = send(client_socket , (char*)&ploadSend , sizeof(ploadSend), 0 );
+  /* check whether all the bytes are sent or not */
+  if(sent_b < sizeof(ploadSend))
+  {
+    //printf("[Client] [ERROR] Complete data not sent\n");
+    return 1;
+  }
+  
+  /* display the date sent */
+  //printf("[Client] Message sent from Client\n{\n Message: %s\n MessageLen: %d\n USRLED: %d\n}\n", \
+                           ploadSend.buf, ploadSend.buf_len, ploadSend.usrLED_OnOff);
+  
+  /* read data sent by server */
+  //read(client_socket, r_data, 4);
+  //printf("[Client]  Message received from Server: %s\n",r_data);
+
+  /* close socket */ 
+  close(client_socket);
+  
+  //return 0;
+
 }
 
 void *func_comm()
@@ -126,6 +177,7 @@ void *func_comm()
 				}	
             }           
 		}
+		comm_client();
 
 	 }
 
@@ -182,9 +234,80 @@ void *func_socket()
 	printf("[Socket Thread] Socket Thread Finished\n");
 }
 
+int alert_client()
+{
+  int client_socket = 0;
+  struct sockaddr_in serv_addr = {0};
+  const char* msg = "Alert Task Alive";
+  payload_t ploadSend;
+  int sent_b;
+  size_t pload_size;
+  char r_data[4] = {0};
+
+  /* Enter the message into payload structure */
+  memcpy(ploadSend.buf,msg,strlen(msg)+1);
+  ploadSend.buf_len = strlen(ploadSend.buf);
+  ploadSend.usrLED_OnOff = 1;
+
+  /* create socket */
+  if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+  {
+    //printf("[Client] [ERROR] Socket creation Error\n");
+    return -1;
+  }
+  else
+    //printf("[Client] Socket Created Successfully\n");
+
+  /* Fill the socket address structure */
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_port = htons(HB_PORT_ADR);
+      
+  /* convert the IP ADDR to proper format */
+  if(inet_pton(AF_INET, IP_ADR, &serv_addr.sin_addr)<=0) 
+  {
+    //printf("[Client] [ERROR] Address Conversion Error\n");
+    return -1;
+  }
+  
+  /* connect the socket before sending the data */
+  if (connect(client_socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+  {
+    //printf("[Client] [ERROR] Connection Failed \n");
+    return -1;
+  }
+
+  /*send the size of the incoming payload */
+  pload_size = sizeof(ploadSend);
+  sent_b = send(client_socket,&pload_size,sizeof(size_t), 0);
+  //printf("[Client] Sent payload size: %d\n", pload_size);
+
+  /*Sending the payload */
+  sent_b = send(client_socket , (char*)&ploadSend , sizeof(ploadSend), 0 );
+  /* check whether all the bytes are sent or not */
+  if(sent_b < sizeof(ploadSend))
+  {
+    //printf("[Client] [ERROR] Complete data not sent\n");
+    return 1;
+  }
+  
+  /* display the date sent */
+  //printf("[Client] Message sent from Client\n{\n Message: %s\n MessageLen: %d\n USRLED: %d\n}\n", \
+                           ploadSend.buf, ploadSend.buf_len, ploadSend.usrLED_OnOff);
+  
+  /* read data sent by server */
+  //read(client_socket, r_data, 4);
+  //printf("[Client]  Message received from Server: %s\n",r_data);
+
+  /* close socket */ 
+  close(client_socket);
+  
+  //return 0;
+
+}
+
 void *func_alert()
 {
-	int alti_flag=0,humid_flag=0;
+	int alti_flag=0,humid_flag=0,p;
 	printf("[Alert Thread] Alert Thread Started\n");
 	
 	while(1)
@@ -210,11 +333,102 @@ void *func_alert()
 			humid_flag = 0;
 			LEDOff();
 		}
+
+		alert_client();
+
+		for(p=0;p<50000000;p++);
 	}
 	
 	printf("[Alert Thread] Alert Thread Finished\n");
 }
 
+int check_status()
+{
+  struct sockaddr_in addr, peer_addr;
+  int addr_len = sizeof(peer_addr);
+  char rdbuff[1024] = {0};
+  int server_socket, accepted_soc, opt = 1;
+  int i = 0;
+  payload_t *ploadptr;
+  int read_b;
+  size_t pload_len = 0;
+
+  /* create socket */
+  if((server_socket = socket(AF_INET,SOCK_STREAM,0)) == 0)
+  {
+    printf("[HBServer] [ERROR] Socket Creation Error\n");
+    return 1;
+  }
+  else
+    printf("[HBServer] Socket Created Successfully\n");
+
+  /* set socket options */
+  if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &(opt), sizeof(opt)))
+  {
+    printf("[HBServer] [ERROR] Socket options set error\n");
+    return 1;
+  }
+
+  /*Set the sockaddr_in structure */
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = INADDR_ANY;  
+  addr.sin_port = htons(HB_PORT_ADR);
+
+  /*bind socket to a address */
+  if((bind(server_socket,(struct sockaddr*)&addr, sizeof(addr))) < 0)
+  {
+    printf("[HBServer] [ERROR] Bind socket Error\n");
+    return 1;
+  }
+  else
+    printf("[HBServer] Socket binded Successfully\n");
+
+  /* listen for connections*/
+  if(listen(server_socket,5) < 0)
+  {
+    printf("[HBServer] [ERROR] Can't listen connection\n");
+    return 1;
+  }
+while(1)
+{
+  /*accept connection */
+  accepted_soc = accept(server_socket, (struct sockaddr*)&peer_addr,(socklen_t*)&addr_len);
+  if(accepted_soc < 0)
+  {
+    printf("[HBServer] [ERROR] Can't accept connection\n");
+    return 1;
+  }
+
+  // read payload length 
+  read_b = read(accepted_soc, &pload_len, sizeof(size_t));
+  if(read_b == sizeof(size_t))
+  {
+    //printf("[HBServer] Size of incoming payload: %d\n",pload_len);
+  } 
+  else
+  {
+    //printf("[HBServer] [ERROR] Invalid data\n");
+    return 1;
+  } 
+
+  // read payload 
+  while((read_b = read(accepted_soc, rdbuff+i, 1024)) < pload_len)
+  {
+    i+=read_b;  
+  }
+  ploadptr= (payload_t*)rdbuff;
+  /* display data */
+  printf("[HBServer]  Message: %s\n",ploadptr->buf);
+  
+  // send message from server to client 
+  //send(accepted_soc , "ACK" , 4, 0);
+  //printf("[HBServer] Message sent from Server: ACK\n");
+}
+  /*close socket */
+  close(accepted_soc);
+
+  return 0;
+}
 
 int startup_test()
 {
@@ -259,6 +473,7 @@ int main()
 		pthread_cancel(alert_id);
 	}
 
+	check_status();
 
 	pthread_join(logger_id,NULL);
 	pthread_join(comm_id,NULL);
